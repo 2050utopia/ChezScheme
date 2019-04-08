@@ -1,5 +1,5 @@
 /* externs.h
- * Copyright 1984-2016 Cisco Systems, Inc.
+ * Copyright 1984-2017 Cisco Systems, Inc.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,6 +59,7 @@ extern void S_dirty_set PROTO((ptr *loc, ptr x));
 extern void S_scan_dirty PROTO((ptr **p, ptr **endp));
 extern void S_scan_remembered_set PROTO((void));
 extern void S_get_more_room PROTO((void));
+extern ptr S_get_more_room_help PROTO((ptr tc, uptr ap, uptr type, uptr size));
 extern ptr S_cons_in PROTO((ISPC s, IGEN g, ptr car, ptr cdr));
 extern ptr S_symbol PROTO((ptr name));
 extern ptr S_rational PROTO((ptr n, ptr d));
@@ -67,6 +68,10 @@ extern ptr S_vector_in PROTO((ISPC s, IGEN g, iptr n));
 extern ptr S_vector PROTO((iptr n));
 extern ptr S_fxvector PROTO((iptr n));
 extern ptr S_bytevector PROTO((iptr n));
+extern ptr S_null_immutable_vector PROTO((void));
+extern ptr S_null_immutable_fxvector PROTO((void));
+extern ptr S_null_immutable_bytevector PROTO((void));
+extern ptr S_null_immutable_string PROTO((void));
 extern ptr S_record PROTO((iptr n));
 extern ptr S_closure PROTO((ptr cod, iptr n));
 extern ptr S_mkcontinuation PROTO((ISPC s, IGEN g, ptr nuate, ptr stack,
@@ -84,14 +89,14 @@ extern ptr S_string PROTO((const char *s, iptr n));
 extern ptr S_bignum PROTO((iptr n, IBOOL sign));
 extern ptr S_code PROTO((ptr tc, iptr type, iptr n));
 extern ptr S_relocation_table PROTO((iptr n));
-extern ptr S_thread_get_more_room PROTO((iptr t, iptr n));
+extern ptr S_weak_cons PROTO((ptr car, ptr cdr));
 
 /* fasl.c */
 extern void S_fasl_init PROTO((void));
 ptr S_fasl_read PROTO((ptr file, IBOOL gzflag, ptr path));
 ptr S_bv_fasl_read PROTO((ptr bv, ptr path));
 /* S_boot_read's f argument is really gzFile, but zlib.h is not included everywhere */
-ptr S_boot_read PROTO((gzFile file, const char *path));
+ptr S_boot_read PROTO((glzFile file, const char *path));
 char *S_format_scheme_version PROTO((uptr n));
 char *S_lookup_machine_type PROTO((uptr n));
 extern void S_set_code_obj PROTO((char *who, IFASLCODE typ, ptr p, iptr n,
@@ -166,19 +171,19 @@ extern IBOOL S_fixedpathp PROTO((const char *inpath));
 
 /* new-io.c */
 extern INT S_gzxfile_fd PROTO((ptr x));
-extern gzFile S_gzxfile_gzfile PROTO((ptr x));
+extern glzFile S_gzxfile_gzfile PROTO((ptr x));
 extern ptr S_new_open_input_fd PROTO((const char *filename, IBOOL compressed));
 extern ptr S_new_open_output_fd PROTO((
   const char *filename, INT mode,
   IBOOL no_create, IBOOL no_fail, IBOOL no_truncate,
-  IBOOL append, IBOOL lock, IBOOL replace, IBOOL compressed));
+  IBOOL append, IBOOL lock, IBOOL replace, IBOOL compressed, IBOOL as_gz));
 extern ptr S_new_open_input_output_fd PROTO((
   const char *filename, INT mode,
   IBOOL no_create, IBOOL no_fail, IBOOL no_truncate,
   IBOOL append, IBOOL lock, IBOOL replace, IBOOL compressed));
 extern ptr S_close_fd PROTO((ptr file, IBOOL gzflag));
 extern ptr S_compress_input_fd PROTO((INT fd, I64 fp));
-extern ptr S_compress_output_fd PROTO((INT fd));
+extern ptr S_compress_output_fd PROTO((INT fd, IBOOL as_gz));
 
 extern ptr S_bytevector_read PROTO((ptr file, ptr buffer, iptr start, iptr count, IBOOL gzflag));
 extern ptr S_bytevector_read_nb PROTO((ptr file, ptr buffer, iptr start, iptr count, IBOOL gzflag));
@@ -193,20 +198,32 @@ extern ptr S_get_fd_length PROTO((ptr file, IBOOL gzflag));
 extern ptr S_set_fd_length PROTO((ptr file, ptr length, IBOOL gzflag));
 extern void S_new_io_init PROTO((void));
 
+extern uptr S_bytevector_compress_size PROTO((iptr s_count, IBOOL as_gz));
+extern ptr S_bytevector_compress PROTO((ptr dest_bv, iptr d_start, iptr d_count,
+                                        ptr src_bv, iptr s_start, iptr s_count,
+                                        IBOOL as_gz));
+extern ptr S_bytevector_uncompress PROTO((ptr dest_bv, iptr d_start, iptr d_count,
+                                          ptr src_bv, iptr s_start, iptr s_count,
+                                          IBOOL as_gz));
+
 /* thread.c */
 extern void S_thread_init PROTO((void));
 extern ptr S_create_thread_object PROTO((const char *who, ptr p_tc));
 #ifdef PTHREADS
 extern ptr S_fork_thread PROTO((ptr thunk));
 extern scheme_mutex_t *S_make_mutex PROTO((void));
+extern void S_mutex_free PROTO((scheme_mutex_t *m));
 extern void S_mutex_acquire PROTO((scheme_mutex_t *m));
 extern INT S_mutex_tryacquire PROTO((scheme_mutex_t *m));
 extern void S_mutex_release PROTO((scheme_mutex_t *m));
 extern s_thread_cond_t *S_make_condition PROTO((void));
-extern void S_condition_wait PROTO((s_thread_cond_t *c, scheme_mutex_t *m));
+extern void S_condition_free PROTO((s_thread_cond_t *c));
+extern IBOOL S_condition_wait PROTO((s_thread_cond_t *c, scheme_mutex_t *m, ptr t));
+extern INT S_activate_thread PROTO((void));
+extern void S_unactivate_thread PROTO((int mode));
 #endif
 
-/* main.c */
+/* scheme.c */
 extern void S_generic_invoke PROTO((ptr tc, ptr code));
 
 /* number.c */
@@ -309,6 +326,7 @@ extern ptr S_gmtime PROTO((ptr tzoff, ptr tspair));
 extern ptr S_asctime PROTO((ptr dtvec));
 extern ptr S_mktime PROTO((ptr dtvec));
 extern ptr S_unique_id PROTO((void));
+extern void S_gettime PROTO((INT typeno, struct timespec *tp));
 
 /* symbol.c */
 extern ptr S_symbol_value PROTO((ptr sym));
@@ -325,18 +343,9 @@ extern void S_machine_init PROTO((void));
 extern void S_initframe PROTO((ptr tc, iptr n));
 extern void S_put_arg PROTO((ptr tc, iptr i, ptr x));
 extern void S_return PROTO((void));
-extern void S_call_help PROTO((ptr tc, IBOOL singlep));
-extern void S_call_void PROTO((void));
-extern ptr S_call_ptr PROTO((void));
-extern iptr S_call_fixnum PROTO((void));
-extern I32 S_call_int32 PROTO((void));
-extern U32 S_call_uns32 PROTO((void));
-extern double S_call_double PROTO((void));
-extern float S_call_single PROTO((void));
-extern U8 *S_call_bytevector PROTO((void));
-extern I64 S_call_int64 PROTO((void));
-extern U64 S_call_uns64 PROTO((void));
-extern uptr S_call_fptr PROTO((void));
+extern void S_call_help PROTO((ptr tc, IBOOL singlep, IBOOL lock_ts));
+extern void S_call_one_result PROTO((void));
+extern void S_call_any_results PROTO((void));
 
 #ifdef WIN32
 /* windows.c */
@@ -345,7 +354,6 @@ extern ptr S_LastErrorString(void);
 extern void *S_ntdlopen(const char *path);
 extern void *S_ntdlsym(void *h, const char *s);
 extern char *S_ntdlerror(void);
-extern char *S_GetRegistry(char *buf, int bufsize, char *s);
 extern int S_windows_flock(int fd, int operation);
 extern int S_windows_chdir(const char *pathname);
 extern int S_windows_chmod(const char *pathname, int mode);

@@ -1,6 +1,6 @@
 "back.ss"
 ;;; back.ss
-;;; Copyright 1984-2016 Cisco Systems, Inc.
+;;; Copyright 1984-2017 Cisco Systems, Inc.
 ;;; 
 ;;; Licensed under the Apache License, Version 2.0 (the "License");
 ;;; you may not use this file except in compliance with the License.
@@ -119,6 +119,11 @@
     (lambda (x)
       (and x #t))))
 
+(define $enable-check-prelex-flags
+  ($make-thread-parameter #f
+    (lambda (x)
+      (and x #t))))
+
 (define-who run-cp0
   ($make-thread-parameter
     (default-run-cp0)
@@ -148,6 +153,14 @@
     (lambda (ifn ofn) (compile-program ifn ofn))
     (lambda (x)
       (unless (procedure? x) ($oops who "~s is not a procedure" x))
+      x)))
+
+(define-who compress-format
+  ($make-thread-parameter
+    'lz4
+    (lambda (x)
+      (unless (or (eq? x 'lz4) (eq? x 'gzip))
+        ($oops who "~s is not a supported format" x))
       x)))
 
 (define-who debug-level
